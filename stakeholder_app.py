@@ -1,76 +1,91 @@
-import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from adjustText import adjust_text
+import streamlit as st
+from io import BytesIO
 
-st.set_page_config(page_title="Stakeholder Sentiment Visualizer", layout="centered")
+# Mapping for axes
+sentiment_mapping = {"Negative": 0, "Neutral": 1, "Positive": 2}
+influence_mapping = {"Low": 0, "Medium": 1, "High": 2}
 
-st.title("📊 Stakeholder Sentiment vs. Influence Clustering")
+# Strategy for each quadrant
+def get_quadrant_label(sentiment, influence):
+    return {
+        ("Positive", "High"): "Champion - Leverage",
+        ("Positive", "Medium"): "Supporter - Engage",
+        ("Positive", "Low"): "Ally - Monitor",
+        ("Neutral", "High"): "Wild Card - Manage Closely",
+        ("Neutral", "Medium"): "Neutral - Educate",
+        ("Neutral", "Low"): "Bystander - Inform",
+        ("Negative", "High"): "Resistor - Mitigate Risk",
+        ("Negative", "Medium"): "Skeptic - Address Concerns",
+        ("Negative", "Low"): "Distractor - Low Priority"
+    }.get((sentiment, influence), "Unknown")
 
-uploaded_file = st.file_uploader("Upload Stakeholder Excel File (.xlsx)", type="xlsx")
+# Load and prepare Excel data
+def load_data(file):
+    df = pd.read_excel(file)
+    df = df.dropna(subset=["Name", "Influence", "Sentiment", "Group", "Size"])
+    df["SentimentScore"] = df["Sentiment"].map(sentiment_mapping)
+    df["InfluenceScore"] = df["Influence"].map(influence_mapping)
+    df["Quadrant"] = df.apply(lambda row: get_quadrant_label(row["Sentiment"], row["Influence"]), axis=1)
+    return df
+
+# Streamlit app layout
+st.title("Stakeholder Sentiment vs. Influence Clustering")
+uploaded_file = st.file_uploader("Upload Stakeholder Excel File", type=["xlsx"])
 
 if uploaded_file:
-    sheet_name = "Stakeholder Analysis"
-
     try:
-        raw_df = pd.read_excel(uploaded_file, sheet_name=sheet_name)
-        header_row_idx = raw_df[raw_df.iloc[:, 0] == "Stakeholder Name"].index[0]
-        df = raw_df.iloc[header_row_idx + 1:].copy()
-        df.columns = raw_df.iloc[header_row_idx]
-
-        # Filter out incomplete rows
-        df = df[df["Stakeholder Name"].notna() & df["Sentiment"].notna() & df["Influence"].notna()]
-        df = df[df["Stakeholder Group"].notna()]
-
-        # Map values
-        sentiment_map = {"Negative": -1, "Neutral": 0, "Positive": 1}
-        influence_map = {"Low": 0, "Medium": 1, "High": 2}
-        impact_size_map = {"Low": 200, "Medium": 400, "High": 600}
-
-        df["Sentiment Value"] = df["Sentiment"].map(sentiment_map)
-        df["Influence Value"] = df["Influence"].map(influence_map)
-        df["Impact Size"] = df["Impact"].map(impact_size_map).fillna(300)
-
-        unique_groups = df["Stakeholder Group"].unique()
-        color_map = {group: color for group, color in zip(unique_groups, plt.cm.tab10.colors)}
-
-        # Plotting
+        df = load_data(uploaded_file)
         fig, ax = plt.subplots(figsize=(10, 8))
-        texts = []
 
-        for group in unique_groups:
-            group_df = df[df["Stakeholder Group"] == group]
-            ax.scatter(group_df["Influence Value"], group_df["Sentiment Value"],
-                       s=group_df["Impact Size"], label=group, alpha=0.7,
-                       color=color_map.get(group, 'gray'), edgecolors='black')
+        # Scatter plot by stakeholder group
+        groups = df["Group"].unique()
+        colors = plt.cm.tab10(range(len(groups)))
 
-            for _, row in group_df.iterrows():
-                text = ax.text(row["Influence Value"], row["Sentiment Value"],
-                               row["Stakeholder Name"], fontsize=9)
-                texts.append(text)
+        for group, color in zip(groups, colors):
+            subset = df[df["Group"] == group]
+            ax.scatter(subset["InfluenceScore"], subset["SentimentScore"],
+                       s=subset["Size"] * 10, alpha=0.7, label=group, c=[color])
 
-        adjust_text(texts,
-                    arrowprops=dict(arrowstyle="-", color='gray', lw=0.5),
-                    expand_points=(2, 2),
-                    expand_text=(2, 2),
-                    force_text=1.2,
-                    force_points=1.0,
-                    lim=500)
+        # Static quadrant annotations
+        quadrant_labels = {
+            (0, 0): "Distractor - Low Priority",
+            (1, 0): "Skeptic - Address Concerns",
+            (2, 0): "Resistor - Mitigate Risk",
+            (0, 1): "Bystander - Inform",
+            (1, 1): "Neutral - Educate",
+            (2, 1): "Wild Card - Manage Closely",
+            (0, 2): "Ally - Monitor",
+            (1, 2): "Supporter - Engage",
+            (2, 2): "Champion - Leverage"
+        }
 
+        for (x, y), label in quadrant_labels.items():
+            ax.text(x, y, label, fontsize=8, ha='center', va='center',
+                    bbox=dict(facecolor='white', alpha=0.6, edgecolor='gray'))
+
+        # Axes and title
         ax.set_xticks([0, 1, 2])
         ax.set_xticklabels(["Low", "Medium", "High"])
-        ax.set_yticks([-1, 0, 1])
+        ax.set_yticks([0, 1, 2])
         ax.set_yticklabels(["Negative", "Neutral", "Positive"])
         ax.set_xlabel("Influence Level")
         ax.set_ylabel("Sentiment")
         ax.set_title("Stakeholder Sentiment vs. Influence Clustering")
-        ax.grid(True)
+        ax.grid(True, linestyle='--', alpha=0.5)
         ax.legend(title="Stakeholder Group", bbox_to_anchor=(1.05, 1), loc='upper left')
-        fig.tight_layout()
 
+        # Render plot
         st.pyplot(fig)
 
+        # PNG download
+        buf = BytesIO()
+        fig.savefig(buf, format="png", bbox_inches='tight')
+        st.download_button("Download Chart as PNG", data=buf.getvalue(),
+                           file_name="stakeholder_chart.png", mime="image/png")
+
     except Exception as e:
-        st.error(f"⚠️ Failed to read or parse Excel file: {e}")
+        st.error(f"⚠️ An error occurred: {str(e)}")
 else:
-    st.info("Upload a stakeholder analysis Excel file to begin.")
+    st.info("📄 Please upload an Excel file with columns: Name, Sentiment, Influence, Group, Size.")
