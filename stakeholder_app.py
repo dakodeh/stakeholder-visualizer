@@ -50,9 +50,16 @@ if uploaded_file:
             lambda row: quadrant_strategies.get((row["Influence Value"], row["Sentiment Value"]), "Undefined"), axis=1
         )
 
-        # Show Engagement Strategy Summary Table
+        # Show expanded stakeholder strategy table
         st.subheader("💡 Stakeholder Engagement Strategy Table")
-        st.dataframe(df[["Stakeholder Name", "Engagement Strategy"]].sort_values(by="Engagement Strategy"))
+        st.dataframe(df[[
+            "Stakeholder Name",
+            "Stakeholder Group",
+            "Sentiment",
+            "Influence",
+            "Impact",
+            "Engagement Strategy"
+        ]].sort_values(by="Engagement Strategy"))
 
         # Plotly chart
         fig = px.scatter(
@@ -61,15 +68,15 @@ if uploaded_file:
             y="Sentiment Jitter",
             size="Impact Size",
             color="Stakeholder Group",
+            hover_name="Stakeholder Name",
             hover_data={
-                "Stakeholder Name": True,
-                "Group": df["Stakeholder Group"],
-                "Sentiment": df["Sentiment"],
-                "Influence": df["Influence"],
-                "Engagement Strategy": df["Engagement Strategy"],
+                "Stakeholder Group": True,
+                "Sentiment": True,
+                "Influence": True,
+                "Engagement Strategy": True,
+                "Impact Size": False,
                 "Influence Jitter": False,
                 "Sentiment Jitter": False,
-                "Impact Size": False,
             },
             size_max=600,
         )
