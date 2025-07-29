@@ -65,6 +65,26 @@ if uploaded_file:
         insight_summary.columns = ["Insight", "Number of Stakeholders"]
         st.dataframe(insight_summary)
 
+        # Recommendation mapping
+        recommendations = {
+            "Engage Immediately": "Directly address concerns and involve in key decisions.",
+            "Maintain Close Watch": "Keep closely informed and watch for attitude shifts.",
+            "Leverage as Advocate": "Involve as a visible supporter in communications.",
+            "Understand Resistance": "Explore reasons for resistance and mitigate concerns.",
+            "Monitor Neutral Parties": "Keep informed and seek small wins to influence.",
+            "Potential Champions": "Encourage deeper involvement and recognize their support.",
+            "Low Priority Resistance": "Monitor but avoid overinvestment.",
+            "Observe Occasionally": "Keep passive tabs unless their influence grows.",
+            "Light Engagement": "Provide occasional updates, leverage if interest grows.",
+            "Unclassified": "Check for missing or unclear data."
+        }
+
+        df["Recommendation"] = df["Quadrant Insight"].map(recommendations)
+
+        # Show individual stakeholder insight table
+        st.subheader("📋 Stakeholder-Level Insights")
+        st.dataframe(df[["Stakeholder Name", "Stakeholder Group", "Sentiment", "Influence", "Quadrant Insight", "Recommendation"]])
+
         # Apply consistent random jitter to reduce overlap
         import numpy as np
         np.random.seed(42)
