@@ -43,12 +43,8 @@ if uploaded_file:
             size="Impact Size",
             color="Stakeholder Group",
             hover_name="Stakeholder Name",
-            hover_data={
-                "Group": df["Stakeholder Group"],
-                "Sentiment": df["Sentiment"],
-                "Influence": df["Influence"],
-                "Impact": df["Impact"]
-            },
+            hover_data=["Stakeholder Group", "Impact"],
+            text="Stakeholder Name",
             size_max=60
         )
 
