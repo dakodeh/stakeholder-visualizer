@@ -31,6 +31,40 @@ if uploaded_file:
         df["Influence Value"] = df["Influence"].map(influence_map)
         df["Impact Size"] = df["Impact"].map(impact_size_map).fillna(300)
 
+        # Assign quadrant insights
+        def determine_quadrant(row):
+            s = row["Sentiment Value"]
+            i = row["Influence Value"]
+            if pd.isna(s) or pd.isna(i):
+                return "Unclassified"
+            if i == 2 and s == -1:
+                return "Engage Immediately"
+            elif i == 2 and s == 0:
+                return "Maintain Close Watch"
+            elif i == 2 and s == 1:
+                return "Leverage as Advocate"
+            elif i == 1 and s == -1:
+                return "Understand Resistance"
+            elif i == 1 and s == 0:
+                return "Monitor Neutral Parties"
+            elif i == 1 and s == 1:
+                return "Potential Champions"
+            elif i == 0 and s == -1:
+                return "Low Priority Resistance"
+            elif i == 0 and s == 0:
+                return "Observe Occasionally"
+            elif i == 0 and s == 1:
+                return "Light Engagement"
+            return "Unclassified"
+
+        df["Quadrant Insight"] = df.apply(determine_quadrant, axis=1)
+
+        # Display insight summary
+        st.subheader("🧠 Quadrant Insight Summary")
+        insight_summary = df["Quadrant Insight"].value_counts().reset_index()
+        insight_summary.columns = ["Insight", "Number of Stakeholders"]
+        st.dataframe(insight_summary)
+
         # Apply consistent random jitter to reduce overlap
         import numpy as np
         np.random.seed(42)
