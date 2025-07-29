@@ -1,80 +1,135 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import random
+import matplotlib.pyplot as plt
+from adjustText import adjust_text
 
 st.set_page_config(page_title="Stakeholder Sentiment Visualizer", layout="centered")
+
 st.title("📊 Stakeholder Sentiment vs. Influence Clustering")
 
 uploaded_file = st.file_uploader("Upload Stakeholder Excel File (.xlsx)", type="xlsx")
 
-def determine_strategy(sentiment, influence):
-    if sentiment == 'Negative' and influence == 'High':
-        return 'Engage Immediately'
-    elif sentiment == 'Positive' and influence == 'High':
-        return 'Leverage as Advocate'
-    elif sentiment == 'Neutral':
-        return 'Monitor Neutral Parties'
-    else:
-        return 'Observe Occasionally'
-
 if uploaded_file:
+    sheet_name = "Stakeholder Analysis"
+
     try:
-        sheet_name = "Stakeholder Analysis"
         raw_df = pd.read_excel(uploaded_file, sheet_name=sheet_name)
         header_row_idx = raw_df[raw_df.iloc[:, 0] == "Stakeholder Name"].index[0]
         df = raw_df.iloc[header_row_idx + 1:].copy()
         df.columns = raw_df.iloc[header_row_idx]
+
+        # Filter out incomplete rows
         df = df[df["Stakeholder Name"].notna() & df["Sentiment"].notna() & df["Influence"].notna()]
         df = df[df["Stakeholder Group"].notna()]
 
+        # Map values
         sentiment_map = {"Negative": -1, "Neutral": 0, "Positive": 1}
         influence_map = {"Low": 0, "Medium": 1, "High": 2}
-        impact_size_map = {"Low": 20, "Medium": 40, "High": 60}
+        impact_size_map = {"Low": 200, "Medium": 400, "High": 600}
 
         df["Sentiment Value"] = df["Sentiment"].map(sentiment_map)
         df["Influence Value"] = df["Influence"].map(influence_map)
-        df["Impact Size"] = df["Impact"].map(impact_size_map).fillna(30)
+        df["Impact Size"] = df["Impact"].map(impact_size_map).fillna(300)
 
-        # Add jitter for improved readability
-        jitter_strength = 0.15
-        df["Jittered Influence"] = df["Influence Value"] + [random.uniform(-jitter_strength, jitter_strength) for _ in range(len(df))]
-        df["Jittered Sentiment"] = df["Sentiment Value"] + [random.uniform(-jitter_strength, jitter_strength) for _ in range(len(df))]
+        # Assign quadrant insights
+        def determine_quadrant(row):
+            s = row["Sentiment Value"]
+            i = row["Influence Value"]
+            if pd.isna(s) or pd.isna(i):
+                return "Unclassified"
+            if i == 2 and s == -1:
+                return "Engage Immediately"
+            elif i == 2 and s == 0:
+                return "Maintain Close Watch"
+            elif i == 2 and s == 1:
+                return "Leverage as Advocate"
+            elif i == 1 and s == -1:
+                return "Understand Resistance"
+            elif i == 1 and s == 0:
+                return "Monitor Neutral Parties"
+            elif i == 1 and s == 1:
+                return "Potential Champions"
+            elif i == 0 and s == -1:
+                return "Low Priority Resistance"
+            elif i == 0 and s == 0:
+                return "Observe Occasionally"
+            elif i == 0 and s == 1:
+                return "Light Engagement"
+            return "Unclassified"
 
-        # Assign engagement strategy
-        df["Engagement Strategy"] = df.apply(lambda x: determine_strategy(x["Sentiment"], x["Influence"]), axis=1)
+        df["Quadrant Insight"] = df.apply(determine_quadrant, axis=1)
 
-        # Display engagement table
-        st.subheader("📋 Stakeholder Engagement Strategies")
-        st.dataframe(df[["Stakeholder Name", "Stakeholder Group", "Sentiment", "Influence", "Impact", "Engagement Strategy"]])
+        # Display insight summary
+        st.subheader("🧠 Quadrant Insight Summary")
+        insight_summary = df["Quadrant Insight"].value_counts().reset_index()
+        insight_summary.columns = ["Insight", "Number of Stakeholders"]
+        st.dataframe(insight_summary)
 
-        # Create interactive plot
-        fig = px.scatter(
-            df,
-            x="Jittered Influence",
-            y="Jittered Sentiment",
-            size="Impact Size",
-            color="Stakeholder Group",
-            text="Stakeholder Name",
-            hover_data={
-                "Stakeholder Name": True,
-                "Stakeholder Group": True,
-                "Sentiment": True,
-                "Influence": True,
-                "Impact": True,
-                "Engagement Strategy": True,
-                "Jittered Influence": False,
-                "Jittered Sentiment": False,
-                "Impact Size": False
-            },
-            labels={"Jittered Influence": "Influence Level", "Jittered Sentiment": "Sentiment"},
-            title="Stakeholder Sentiment vs. Influence Clustering"
-        )
+        # Recommendation mapping
+        recommendations = {
+            "Engage Immediately": "Directly address concerns and involve in key decisions.",
+            "Maintain Close Watch": "Keep closely informed and watch for attitude shifts.",
+            "Leverage as Advocate": "Involve as a visible supporter in communications.",
+            "Understand Resistance": "Explore reasons for resistance and mitigate concerns.",
+            "Monitor Neutral Parties": "Keep informed and seek small wins to influence.",
+            "Potential Champions": "Encourage deeper involvement and recognize their support.",
+            "Low Priority Resistance": "Monitor but avoid overinvestment.",
+            "Observe Occasionally": "Keep passive tabs unless their influence grows.",
+            "Light Engagement": "Provide occasional updates, leverage if interest grows.",
+            "Unclassified": "Check for missing or unclear data."
+        }
 
-        fig.update_traces(textposition='top center')
-        fig.update_layout(legend_title_text='Stakeholder Group')
+        df["Recommendation"] = df["Quadrant Insight"].map(recommendations)
 
-        st.plotly_chart(fig)
+        # Show individual stakeholder insight table
+        st.subheader("📋 Stakeholder-Level Insights")
+        st.dataframe(df[["Stakeholder Name", "Stakeholder Group", "Sentiment", "Influence", "Quadrant Insight", "Recommendation"]])
+
+        # Apply consistent random jitter to reduce overlap
+        import numpy as np
+        np.random.seed(42)
+        jitter_strength = 0.25
+        df["Jittered_Influence"] = df["Influence Value"] + np.random.uniform(-jitter_strength, jitter_strength, len(df))
+        df["Jittered_Sentiment"] = df["Sentiment Value"] + np.random.uniform(-jitter_strength, jitter_strength, len(df))
+
+        unique_groups = df["Stakeholder Group"].unique()
+        color_map = {group: color for group, color in zip(unique_groups, plt.cm.tab10.colors)}
+
+        # Plotting
+        fig, ax = plt.subplots(figsize=(10, 8))
+        texts = []
+
+        for group in unique_groups:
+            group_df = df[df["Stakeholder Group"] == group]
+            ax.scatter(group_df["Jittered_Influence"], group_df["Jittered_Sentiment"],
+                       s=group_df["Impact Size"], label=group, alpha=0.7,
+                       color=color_map.get(group, 'gray'), edgecolors='black')
+
+            for _, row in group_df.iterrows():
+                text = ax.text(row["Jittered_Influence"], row["Jittered_Sentiment"],
+                               row["Stakeholder Name"], fontsize=9)
+                texts.append(text)
+
+        adjust_text(texts,
+                    arrowprops=dict(arrowstyle="-", color='gray', lw=0.5),
+                    expand_points=(2, 2),
+                    expand_text=(2, 2),
+                    force_text=1.2,
+                    force_points=1.0,
+                    lim=500)
+
+        ax.set_xticks([0, 1, 2])
+        ax.set_xticklabels(["Low", "Medium", "High"])
+        ax.set_yticks([-1, 0, 1])
+        ax.set_yticklabels(["Negative", "Neutral", "Positive"])
+        ax.set_xlabel("Influence Level")
+        ax.set_ylabel("Sentiment")
+        ax.set_title("Stakeholder Sentiment vs. Influence Clustering")
+        ax.grid(True)
+        ax.legend(title="Stakeholder Group", bbox_to_anchor=(1.05, 1), loc='upper left')
+        fig.tight_layout()
+
+        st.pyplot(fig)
 
     except Exception as e:
         st.error(f"⚠️ Failed to read or parse Excel file: {e}")
