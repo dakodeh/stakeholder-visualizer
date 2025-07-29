@@ -31,6 +31,13 @@ if uploaded_file:
         df["Influence Value"] = df["Influence"].map(influence_map)
         df["Impact Size"] = df["Impact"].map(impact_size_map).fillna(300)
 
+        # Apply consistent random jitter to reduce overlap
+        import numpy as np
+        np.random.seed(42)
+        jitter_strength = 0.25
+        df["Jittered_Influence"] = df["Influence Value"] + np.random.uniform(-jitter_strength, jitter_strength, len(df))
+        df["Jittered_Sentiment"] = df["Sentiment Value"] + np.random.uniform(-jitter_strength, jitter_strength, len(df))
+
         unique_groups = df["Stakeholder Group"].unique()
         color_map = {group: color for group, color in zip(unique_groups, plt.cm.tab10.colors)}
 
@@ -40,12 +47,12 @@ if uploaded_file:
 
         for group in unique_groups:
             group_df = df[df["Stakeholder Group"] == group]
-            ax.scatter(group_df["Influence Value"], group_df["Sentiment Value"],
+            ax.scatter(group_df["Jittered_Influence"], group_df["Jittered_Sentiment"],
                        s=group_df["Impact Size"], label=group, alpha=0.7,
                        color=color_map.get(group, 'gray'), edgecolors='black')
 
             for _, row in group_df.iterrows():
-                text = ax.text(row["Influence Value"], row["Sentiment Value"],
+                text = ax.text(row["Jittered_Influence"], row["Jittered_Sentiment"],
                                row["Stakeholder Name"], fontsize=9)
                 texts.append(text)
 
