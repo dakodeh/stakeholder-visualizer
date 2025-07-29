@@ -5,7 +5,7 @@ from adjustText import adjust_text
 
 st.set_page_config(page_title="Stakeholder Sentiment Visualizer", layout="centered")
 
-st.title("📊 Stakeholder Sentiment vs. Influence Clustering v2.0.1")
+st.title("📊 Stakeholder Sentiment vs. Influence Clustering")
 
 uploaded_file = st.file_uploader("Upload Stakeholder Excel File (.xlsx)", type="xlsx")
 
